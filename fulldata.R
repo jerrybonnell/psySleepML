@@ -5,7 +5,7 @@ library(surveytoolbox)
 library(dplyr)
 library(readxl)
 
-##### RUN QUESTIONNAIRE2.R FIRST #####
+##### RUN QUESTIONNAIRE.R FIRST #####
 ########################################################################
 
 dyad_exclude_list <- c("B085", "B181", "B372", "B691", "B692", "B761", "B781", "B824", "B929", "B814")
