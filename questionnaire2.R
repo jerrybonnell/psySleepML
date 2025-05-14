@@ -1,4 +1,4 @@
-### Youngmee Kim 3/2/24 Questionnaire DB
+### Script to assemble tables for each questionnaire predictor group from given syntax
 
 library(tidyverse)
 library(haven)
