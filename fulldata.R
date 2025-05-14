@@ -1,3 +1,5 @@
+# Script to generate integrated sleep csv
+
 library(tidyverse)
 library(haven)
 library(labelled)
@@ -770,23 +772,14 @@ var_removelist = c("rlpdurmn_",       # have relationship in years, don't need i
 df_full = df_full |> select(-starts_with(var_removelist)) |> arrange(BiPs_DID)
 View(df_full)
 
-# df_full |>
-#   write_csv("integrated/BiPs_PTFM_T1_integrated_full_082124.csv")
-# df_full |>
-#   write_csv("integrated/BiPs_PTFM_T1_integrated_full_101424.csv")
-# df_full |>
-#   write_csv("integrated/BiPs_PTFM_T1_integrated_full_012025.csv")
 df_full |>
   write_csv("integrated/BiPs_PTFM_T1_integrated_full_012325.csv")
 
-# View(data.frame(names(df_full)))
-# 845 columns total
-# 628 total from questionnaire (pt and fm, and sd columns)
-# 12 total from cardio (6 phases per pt and fm)
-# 34 total from screener (17 from pt and fm each)
-# 56 total from mood (15 composites (means) per pt and fm)
-# 14 total from sleep (7 per pt and fm)
-# 10 total from actigraph composition (5 per pt and fm)
-# 6 total from actigraph rhythm (3 per pt and fm)
-# 42 total from bp (3 per 7 phases per pt and fm)
-# 42 from affect (7 phases for na, pa, stress per pt and fm)
+
+#---------------------------------------------------------------------------
+pred_list = c("_q", "_screen", "_cardio", "_co", "_clo")
+
+with_sleep = df_full |> select(BiPs_DID, contains(c(pred_list, "_sleep", "_actcomp", "_actrhythm")), -starts_with("sd_"))
+
+with_sleep |>
+  write_csv("integrated/BiPs_PTFM_T1_integrated_sleep_012325.csv")
