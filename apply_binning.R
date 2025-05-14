@@ -1,26 +1,11 @@
+## Script to apply adaptive binning to questionnaire predictors
+
 library(tidyverse)
-# library(haven)
-# library(labelled)
-# library(surveytoolbox)
 library(dplyr)
 library(ggcorrplot)
-# library(ggstatsplot)
-# library(correlation)
-# install.packages("fastDummies")
-# library(fastDummies)
 library(tidymodels)
-# library(recipes)
-# library(embed)
-# library(ggplot2)
 
-# with_sleep <- read_csv("integrated/BiPs_PTFM_T1_integrated_sleep_082124.csv")
-# with_sleep <- read_csv("integrated/BiPs_PTFM_T1_integrated_sleep_101424.csv")
 with_sleep <- read_csv("integrated/BiPs_PTFM_T1_integrated_sleep_012325.csv")
-# TODO toggle between these two source() lines
-source("my_step_custom.R")
-source("step_correlated.R")
-attach(recipes_extended)
-attach(recipes_extended2)
 
 ### NOTE run this script in isolation first so that the function specifications 
 ### are collected into the R environment, before use in eda2_jerry.R
@@ -194,16 +179,6 @@ bin_data <- function(data, thrsh_count) {
   
 }
 
-### testing...
-myt <- tibble(test = c(rep(0, 50), rep(1, 30), rep(2, 15),
-                       rep(3, 7), rep(4, 5), rep(5, 6),
-                       rep(6, 3), rep(7, 6), NA))
-bin_data(myt$test, 20)
-bin_data(test_factor$`hcareut_fm1_q16a-m`, 20)
-# bin_data(runif(100), 20)
-
-
-
 apply_binning <- function(data, max_bins = 4) {
   # Check if the data is numeric
   if (!is.numeric(data)) {
@@ -260,18 +235,6 @@ apply_binning <- function(data, max_bins = 4) {
 }
 
 
-# # Testing distribution from binning algorithm
-# hist(test_factor$morb_pt1_q15)
-# 
-# barplot(table(test_binned$morb_pt1_q15), 
-#         main = "Bar Plot of Factor Variable by Count", 
-#         xlab = "Factor Levels", 
-#         ylab = "Frequency", 
-#         col = "skyblue", 
-#         border = "black")
-# 
-# hist(as.numeric(test_binned$morb_pt1_q15))
-
 recode_fct_strings <- function(col_data) {
   #col_name <- quo_name(enquo(col))
   tib <- tibble(col = col_data)
@@ -327,168 +290,3 @@ test_binned<- test_binned |>
 
 test_binned |> write_csv("integrated/BiPs_PTFM_T1_integrated_sleep_binned_012325.csv")
 #### STOP HERE
-
-only_q <- test_binned |>
-  select(matches(".*_q.*")|contains(c("_sleep", "_actcomp", "_actrhythm")))
-only_screen <- test_binned |>
-  select(matches(".*_screen")|contains(c("_sleep", "_actcomp", "_actrhythm")))
-only_ecg <- test_binned |>
-  select(matches(".*_cardio")|contains(c("_sleep", "_actcomp", "_actrhythm")))
-only_co <- test_binned |>
-  select(matches(".*_co$")|contains(c("_sleep", "_actcomp", "_actrhythm")))
-################################################################################
-library(rlang)
-
-include_list <- c(".*_q.*", ".*_screen", ".*_cardio", ".*_co$")
-pred_names <- test_binned |>
-  select(matches(include_list)) |>
-  colnames()
-out_names <- test_binned |>
-  select(contains(c("_sleep", "_actcomp", "_actrhythm"))|BiPs_DID) |>
-  colnames()
-
-
-folds <- bootstraps(test_binned, times = 10)
-
-my_recipe <- function(outcome) {
-  other_outs <- out_names[out_names != outcome]
-  # form <- new_formula(ensym(outcome), expr(.))
-  form <- new_formula(ensym(outcome), expr(.))
-  # NOTE do not worry that the recipe is defined using the full data in
-  # test_binned; see the following two links: 
-  # https://recipes.tidymodels.org/articles/recipes.html#an-initial-recipe
-  # The data contained in the data argument need not be the training set; 
-  # this data is only used to catalog the names of the 
-  # variables and their types (e.g. numeric, etc.).
-  # https://rsample.tidymodels.org/articles/Applications/Recipes_and_rsample.html
-  # While the original data object ames is used in the call, it is only used 
-  # to define the variables and their characteristics so a single recipe is 
-  # valid across all resampled versions of the data. The recipe can be 
-  # estimated on the analysis component of the resample.
-  recipe(form, data = test_binned) |>
-    step_rm(any_of(other_outs)) |> 
-    step_impute_mean(all_outcomes()) |>
-    step_impute_mean(all_numeric_predictors()) |>
-    step_unknown(all_factor_predictors()) |>
-    step_log(ends_with(c("cardio")), offset = 1) |>
-    step_log(all_outcomes(), offset = 1) |>
-    step_normalize(all_numeric_predictors()) |>
-    step_dummy(all_factor_predictors()) |>
-    step_zv(all_predictors()) |>
-    step_custom(all_predictors(),
-                outcome = outcome, mtry = 3, ntree = 1000,
-                minbucket = 5, minsplit = 10)
-  #step_nzv(all_predictors(), freq_cut = 95/5)
-}
-
-my_recipe2 <- function(outcome) {
-  other_outs <- out_names[out_names != outcome]
-  form <- new_formula(ensym(outcome), expr(.))
-  
-  recipe(form, data = test_binned) |>
-    step_rm(any_of(other_outs)) |> 
-    step_impute_mean(all_outcomes()) |>
-    step_impute_mean(all_numeric_predictors()) |>
-    step_unknown(all_factor_predictors()) |>
-    step_log(ends_with("cardio")|ends_with("co"), offset = 1) |>
-    step_log(all_outcomes(), offset = 1) |>
-    step_zv(all_predictors()) |>
-    step_normalize(all_numeric_predictors()) |>
-    step_dummy(all_factor_predictors()) |>  # Generate dummy variables
-    step_correlated(all_predictors(),  # Use the dummy predictors
-                    outcome = outcome, r_val = 0.2)  # Call your custom step here
-} # extraversion_TIPI_pt1_q37_X3 
-
-juice(prep(my_recipe("tb110_mean_fm1_sleep")))
-# juice(prep(my_recipe2("tb110_mean_fm1_sleep")))
-juice(prep(my_recipe2("tb110_mean_fm1_sleep"), folds |> pluck(1,3,1)))
-
-# feat_num_check <- function (index, my_col_to_check) {
-#   tib<-juice(prep(my_recipe(my_col_to_check), folds |> pluck(1,index,1))) |>
-#     list(x = _) |>
-#     with(summarize(x,
-#                    screen=sum(str_detect(colnames(x), ".*_screen_.*"))/71,
-#                    q=sum(str_detect(colnames(x), ".*_q.*"))/850,
-#                    cardio=sum(str_detect(colnames(x), ".*_cardio$"))/12,
-#                    co=sum(str_detect(colnames(x), ".*_co$"))/24))
-#   list(tib |> mutate(checked = my_col_to_check))
-# }
-# feat_checked <- map(out_names[out_names != "BiPs_DID"], 
-#         \(x) map(1:5, \(y) feat_num_check(y, x)) |> bind_rows(),
-#         .progress = T) |>
-#   bind_rows() |>
-#   summarize(across(c(screen, q, cardio, co), mean))
-
-
-# TODO note that LASSO was replaced by SVM here. this is because I found that
-# the LASSO model zero-d out all predictors, effectively a useless model. I
-# suspect that after the variable selection work the LASSO model may perform
-# better. we should reintroduce the LASSO model to evaluate this better
-lin_mod1 <- linear_reg(penalty = 0.1, mixture = 0) |>
-  set_engine("glmnet")
-lin_mod2 <- svm_rbf(mode="regression") |>
-  set_engine("kernlab")
-# TODO mtry and trees needs tuning, via tune(), 
-# workflow_map below probably needs to be changed to "tune_gird"
-# https://tune.tidymodels.org/reference/tune_grid.html
-forest <- rand_forest(mode = "regression", mtry = 20, trees = 500) |>
-  set_engine("ranger", importance = "impurity")
-
-# step through and test each of the individual outcomes 
-# TODO toggle between these 
-my_recipes <- map(out_names[out_names != "BiPs_DID"], my_recipe)
-# my_recipes <- map(out_names[out_names != "BiPs_DID"], my_recipe2)
-
-names(my_recipes) <- out_names[out_names != "BiPs_DID"]
-# wf_set <- workflow_set(my_recipes, list(ridge=lin_mod1,
-#                                         svm=lin_mod2,
-#                                         forest=forest))
-# wf_set <- workflow_set(my_recipes, list(ridge=lin_mod1, svm=lin_mod2))
-wf_set <- workflow_set(my_recipes, list(ridge=lin_mod1))
-
-library(future)
-library(doFuture)
-library(parallel)
-
-setup_worker <- function() {
-  library(recipes)
-  library(tidymodels)
-  library(dplyr)
-  library(correlation)
-  # TODO toggle between these; change these paths! 
-  source("/Users/jerrybonnell/local/postdoc/bips/Psycho-Oncology-IDSC/my_step_custom.R")
-  source("/Users/jerrybonnell/local/postdoc/bips/Psycho-Oncology-IDSC/step_correlated.R")
-  attach(recipes_extended)
-  attach(recipes_extended2)
-}
-
-cl_spec <- rep("localhost", each = 6)
-plan(cluster, workers = cl_spec)
-
-future.apply::future_lapply(seq_along(cl_spec), function(i) setup_worker())
-
-registerDoFuture()
-
-options(tidymodels.dark = T)
-wf_res <- workflow_map(wf_set, "fit_resamples", resamples = folds, 
-                       metrics = metric_set(rmse, rsq),
-                       verbose = TRUE, 
-                       control = control_resamples(save_workflow = TRUE,
-                                                   save_pred = FALSE, 
-                                                   parallel_over = "resamples"))
-wf_res
-
-rank_results(wf_res, rank_metric="rsq") |>
-  filter(.metric %in% c("rsq", "rmse")) |>
-  separate(wflow_id, sep = "_(?=[^_]+$)", into = c("out", "mname")) |>
-  separate(out, sep = "_(?=[^_]+$)", into = c("feat", "db")) |>
-  ggplot() +
-  geom_point(aes(x = rank, y = mean, color = mname, shape = db)) + 
-  geom_errorbar(aes(x = rank, color = mname,
-                    ymin = mean - std_err * qnorm(0.95),
-                    ymax = mean + std_err * qnorm(0.95)),
-                width=0.3) +
-  facet_wrap(~.metric, scales = "free") +
-  theme_bw() + 
-  labs(color = "model")
-
