@@ -11,20 +11,13 @@ OUTPUT_FILE="${SCRIPT_DIR}/loocv_results.jsonl"
 # Remove output file if it exists
 rm -f $OUTPUT_FILE
 
-# seq 0 $(($N_FOLDS-1)) | parallel --jobs $N_JOBS \
-#     --progress \
-#     --bar \
-#     --eta \
-#     "python ${PYTHON_SCRIPT} {} 1" >> "$OUTPUT_FILE"
-# "000" "001" "010" "011" "100" "101" "110" "111"
-
 parallel --jobs $N_JOBS \
     --progress \
     --bar \
     --eta \
-    "python ${PYTHON_SCRIPT} {1} 1 {2}" \
+    "python ${PYTHON_SCRIPT} {1} 0 {2}" \
     ::: $(seq 0 $(($N_FOLDS-1))) \
-    ::: "101" \
+    ::: "000" "001" "010" "011" "100" "101" "110" "111" \
     >> $OUTPUT_FILE
 
 python - <<EOF
@@ -55,15 +48,6 @@ with open('loocv_results.jsonl', 'r') as f:
 
 res = pd.DataFrame(results)
 print(res.head())
-
-# grouped_wt_results = []
-# for (outcome, model_type), group in res.groupby(['out', 'model']):
-#     features = group['feat_names'].iloc[0]
-#     avg_weights = dict(
-#         zip(features, np.mean([weights for weights in group['abs_weights']], axis=0).tolist()))
-#     avg_weights['out'] = outcome
-#     avg_weights['model'] = model_type
-#     grouped_wt_results.append(avg_weights)
 
 grouped_wt_results = []
 for (outcome, model_type, preproc), group in tqdm(res.groupby(['out', 'model', 'preproc'])):
