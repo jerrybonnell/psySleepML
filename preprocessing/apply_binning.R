@@ -1,4 +1,4 @@
-## Script to apply adaptive binning to questionnaire predictors
+### Script to apply adaptive binning to questionnaire predictors
 
 library(tidyverse)
 library(dplyr)
