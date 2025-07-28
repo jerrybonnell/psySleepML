@@ -3,7 +3,7 @@ import numpy as np
 import sys
 import json
 import shap
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import r2_score
@@ -29,7 +29,7 @@ from sklearn.ensemble import BaggingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import cross_val_score  
+from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 
 # outcome_tests = {1: ["IS_fm1_actrhythm"]}
@@ -40,32 +40,6 @@ outcome_tests = {1: ["se36_mean_pt1_sleep"]}
 # outcome_tests = {1: ["se36_mean_pt1_sleep"]}
 # outcome_tests = {1: ["avgSOL_min_pt_actcomp"]}
 
-"""
-todo list
-TODO [] need to re-incorporate the correlated features analysis
-TODO [] need to play with different settings of PCA and training data augmentation
-        (different # components, # bins, different augmentation algorithms)
-NOTE two different PCA approaches possible:
-     (1) apply to the entire feature set
-     (2) apply only to questionnaire features (seems to work better)
-TODO [] (!!) for RIDGE model need to play with different penalty thresholds
-        (compress until 50% of features remain, 40%, etc.)
-TODO [] why doesn't LASSO work well for this data? perhaps it will work better
-        with the PCA'd features
-TODO [x] need to redo the variable feature importance visualization for python
-TODO [] (!!) may need to re-orient the variable feature importance experiment as
-        an ablation study to better distill the influence of features derived
-        from the different databases
-
-other todo's:
-TODO cardio and co databases -- need to understand missingness better
-    * how many rows have missing data?
-    * how many of the phases from some subject are missing?
-    * many not be an across-the-board MNAR or MAR, some rows may be MAR and
-      others might be MNAR; the device could have failed for one subject,
-      for another subject the reason is they couldn't take it anymore and
-      quit the study
-"""
 
 def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
     test_binned = pd.read_csv("../integrated/BiPs_PTFM_T1_integrated_sleep_binned_012325.csv")
@@ -108,6 +82,7 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             # self.pca_transformer = PCA(n_components=30)
             self.pca_transformer = None
             self.scaler = StandardScaler()
+            self.pca_scaler = StandardScaler()
             self.power_transformer = None
             self.clo_pca = None
 
@@ -138,11 +113,11 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             if self.zero_var_cols:
                 data = data.drop(columns=self.zero_var_cols)
             return data
-        
+
         def _select_correlated_features(self, data, outcome, fit=True, correlation_threshold=0.1):
             """Select features correlated with any outcome above the threshold"""
             if fit:
-                
+
                 correlation_with_outcome = data.corr()[outcome]
                 correlated_features = correlation_with_outcome[
                     correlation_with_outcome.abs() >= correlation_threshold].index.tolist()
@@ -199,10 +174,11 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 self.pca_transformer = PCA(n_components=final_n, svd_solver='full')
 
                 X_pca = self.pca_transformer.fit_transform(data_X)
+                X_pca = self.pca_scaler.fit_transform(X_pca)
                 X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}_q' for i in range(X_pca.shape[1])])
                 # data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
-              
+
                 data.to_csv("after_pca.csv")
 
             ## step_correlated
@@ -266,6 +242,7 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 data_X = data.filter(regex='_q') #data.drop(columns=self.out)
                 data_y = data.drop(data.filter(regex='_q').columns, axis=1) #data[self.out]
                 X_pca = self.pca_transformer.transform(data_X)
+                X_pca = self.pca_scaler.transform(X_pca)
                 X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}_q' for i in range(X_pca.shape[1])])
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
 
@@ -274,7 +251,7 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 #                                 fit=False,
                 #                                 clo_threshold=clo_threshold,
                 #                                 other_threshold=other_threshold)
-                
+
                 data = self._select_correlated_features(data, self.out,
                         fit=False, correlation_threshold=correlation_threshold)
 
@@ -300,14 +277,14 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             'RIDGE': Ridge(alpha=1.0, random_state=2025),
             'SVR': SVR(C=0.4, kernel='linear'),
             'LR': LinearRegression(),
-            'RF': RandomForestRegressor(random_state=2025)  
+            'RF': RandomForestRegressor(random_state=2025)
         }
 
         pipeline = PreprocessingPipeline(
             given_out=one_outcome,
             outcome_names=outcome_names
         )
-        
+
         # Fit and transform training data
         X_train, y_train = pipeline.fit_transform(test_binned.iloc[train_index, :])
         X_test, y_test = pipeline.transform(test_binned.iloc[test_index, :])
@@ -318,7 +295,7 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             model.fit(X_train, y_train)
 
             # Compute SHAP values
-            if name == 'RF':  
+            if name == 'RF':
                 explainer = shap.TreeExplainer(model)
             else:
                 explainer = shap.Explainer(model, X_train)
