@@ -67,6 +67,7 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model):
             self.pca_transformer = None
             self.loadings = None
             self.scaler = StandardScaler()
+            self.pca_scaler = StandardScaler()
             self.power_transformer = None
             self.clo_pca = None
             self.pca_in_cols = None
@@ -101,7 +102,7 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model):
             if self.zero_var_cols:
                 data = data.drop(columns=self.zero_var_cols)
             return data
-            
+
         def _select_correlated_features(self, data, outcome, fit=True, q_threshold=0.1, other_threshold=0.1):
             if fit:
                 # Calculate correlation with the outcome
@@ -175,6 +176,7 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model):
 
                 self.pca_in_cols = data_X.columns.tolist()
                 X_pca = self.pca_transformer.fit_transform(data_X)
+                X_pca = self.pca_scaler.fit_transform(X_pca)
                 self.loadings = pd.DataFrame(self.pca_transformer.components_,
                                              columns=self.pca_transformer.feature_names_in_)
                 X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(X_pca.shape[1])])
@@ -251,6 +253,7 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model):
                 data_X = data.filter(regex='_q') #data.drop(columns=self.out)
                 data_y = data.drop(data.filter(regex='_q').columns, axis=1) #data[self.out]
                 X_pca = self.pca_transformer.transform(data_X)
+                X_pca = self.pca_scaler.transform(X_pca)
                 X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(X_pca.shape[1])])
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
 
