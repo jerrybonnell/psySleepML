@@ -27,18 +27,9 @@ from sklearn.impute import KNNImputer
 from scipy.stats import spearmanr
 from statsmodels.stats.multitest import multipletests
 
-# outcome_tests = {1: ["IS_fm1_actrhythm", "avgSOL_min_pt_actcomp", "avgWASO_min_fm_actcomp", "se36_mean_pt1_sleep"]}
-# outcome_tests = {1: ["IS_fm1_actrhythm"]}
-# outcome_tests = {1: ["IS_fm1_actrhythm"]}
-# outcome_tests = {1: ["se36_mean_pt1_sleep"]}
-# outcome_tests = {1: ["tb110_mean_pt1_sleep"]}
-# outcome_tests = {1: ["se36_mean_pt1_sleep"]}
-# outcome_tests = {1: ["avgSOL_min_pt_actcomp"]}
-
-# outcome_tests = {1: ["aaslp7avg_pt1_dailysaliva", "cortslp7avg_pt1_dailysaliva", "dheasslp7avg_pt1_dailysaliva",
-#                      "aaslp7avg_fm1_dailysaliva", "cortslp7avg_fm1_dailysaliva", "dheasslp7avg_fm1_dailysaliva"]}
-
-outcome_tests = {1: ["aaslp7sd_pt1_dailysaliva", "cortslp7sd_pt1_dailysaliva", "dheasslp7sd_pt1_dailysaliva",
+outcome_tests = {1: ["aaslp7avg_pt1_dailysaliva", "cortslp7avg_pt1_dailysaliva", "dheasslp7avg_pt1_dailysaliva",
+                     "aaslp7avg_fm1_dailysaliva", "cortslp7avg_fm1_dailysaliva", "dheasslp7avg_fm1_dailysaliva",
+					 "aaslp7sd_pt1_dailysaliva", "cortslp7sd_pt1_dailysaliva", "dheasslp7sd_pt1_dailysaliva",
                      "aaslp7sd_fm1_dailysaliva", "cortslp7sd_fm1_dailysaliva", "dheasslp7sd_fm1_dailysaliva"]}
 
 
@@ -70,17 +61,8 @@ TODO cardio and co databases -- need to understand missingness better
 """
 
 def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="both", alpha=0.10):
-    # test_binned = pd.read_csv("../integrated/BiPs_PTFM_T1_integrated_saliva_binned_122325.csv")
     test_binned = pd.read_csv("../integrated/BiPs_PTFM_T1_integrated_saliva_binned_012026.csv")
 
-    # cols = [c for c in list(test_binned.columns) if c in list(test_binned.filter(regex='(BiPs_DID)|(_screen)|(_q)|(_actcomp)|(_actrhythm)|(_sleep)|(_co$)|(_cardio)|(gamma_sp1)|(_acutesaliva)'))]
-    # cols = [c for c in list(test_binned.columns) if c in list(test_binned.filter(regex='(BiPs_DID)|(_screen)|(_q)|(_dailysaliva)|(_co$)|(_cardio)|(gamma_sp1)'))]
-    # cols = [
-    #     c for c in test_binned.columns
-    #     if c in test_binned.filter(
-    #         regex=r'(BiPs_DID)|(_screen)|(_q)|(_dailysaliva)|(_co$)|(_cardio)|(gamma_sp1)|((cort_|aa_).+_acutesaliva)'
-    #     )
-    # ]
     cols = [
         c for c in test_binned.columns
         if c in test_binned.filter(
@@ -89,7 +71,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
     ]
 
     test_binned = test_binned[cols]
-    # test_binned = pd.read_csv("../integrated/BiPs_PTFM_T1_integrated_sleep_binned_101424.csv")
 
     test_binned[test_binned.filter(regex='_q').columns] = test_binned.filter(regex='_q')\
         .apply(
@@ -111,18 +92,13 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
     assert use_pca is not None
     assert use_corr is not None
     assert use_aug is not None
-    # print(f"pca {use_pca} corr {use_corr} aug {use_aug}")
 
     def _y_policy_for_outcome(out_name):
         o = out_name.lower()
         if o.startswith("cortslp7avg") and "_fm1_" in o:
-            # return "scale_only"
             return "asinh_unscaled"
         if o.startswith("dheasslp7avg") and "_pt1_" in o:
-            # return "asinh_unscaled"
             return "asinh_unscaled"
-        # if o.startswith("aaslp7") or o.startswith("cortslp7"):
-        #     return "asinh_scaled"
         return "asinh_scaled"
 
     class PreprocessingPipeline:
@@ -252,7 +228,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             s = getattr(self, "y_asinh_scale")
             return np.arcsinh(y / s)
 
-        # def fit_transform(self, data, clo_threshold=0.0, other_threshold=0.1):
         def fit_transform(self, data, correlation_threshold=0.1, view="both"):
             """Fit the pipeline to training data and transform it"""
             data = data.copy()
@@ -275,13 +250,9 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             # there should be no missing values beyond this point
             assert not data.isnull().values.any()
 
-            # data.to_csv("after_dummy.csv")
-
             # step_zv
             data = self._remove_zero_variance(data, fit=True)
             data.pop('BiPs_DID')
-
-            # data.to_csv("after_zv.csv")
 
             ## step_pca
             if self.use_pca:
@@ -329,7 +300,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
                 data_for_corr_fit = data
 
             ## step_correlated
-            # data.to_csv("after_corr.csv")
             if self.use_corr:
                 _ = self._select_correlated_features(
                     data_for_corr_fit, self.out, fit=True,
@@ -339,12 +309,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
                     data, self.out, fit=False,
                     correlation_threshold=correlation_threshold
                 )
-
-                # data = self._select_correlated_features(data, self.out,
-                #                                          fit=True,clo_threshold=clo_threshold, other_threshold=other_threshold)
-                # if returning without data augmentation:
-                # y = data.pop(self.out)
-                # return data, y
 
             ## LINES 187-195 data augmentation
             # the use of data augmentation here also functions as an alternative to the log
@@ -399,18 +363,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
                 idx = sampler.sample_indices_
                 y_res = y_cont.iloc[idx].to_numpy()
                 return X_res, y_res
-                # np.random.seed(2025)
-                # rs = resampler()
-                # y_classes = rs.fit(data, target=self.out, bins = 5,verbose=0)
-                # unq_classes = np.unique(y_classes)
-                # X_res, y_res = rs.resample(
-                #     RandomOverSampler(sampling_strategy={clss_lbl: 300 for clss_lbl in unq_classes},
-                #                       random_state=2025
-                #     ),
-                #     trainX=data,
-                #     trainY=y_classes
-                # )
-                # return X_res, y_res
             else:
                 # if returning without data augmentation:
                 y = data.pop(self.out)
@@ -431,7 +383,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             data[self.numeric_columns] = self.numeric_imputer.transform(data[self.numeric_columns])
 
             # step log -- all predictor variables, *not* outcomes
-            # log_cols = [col for col in data.columns if col.endswith('cardio') or col == self.out]
             log_cols = [col for col in data.columns if col.endswith('cardio') or col.endswith('clo') or col.endswith('_co') or col.endswith('acutesaliva')]
             for col in log_cols:
                 data[col] = np.log1p(data[col])
@@ -442,24 +393,8 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             data = self._remove_zero_variance(data, fit=False)
             data.pop('BiPs_DID')
 
-            # clo_columns = data.filter(regex='_clo')
-            # transformed_clo = self.clo_pca.transform(clo_columns)
-            # transformed_clo = pd.DataFrame(
-            #     transformed_clo,
-            #     columns=[f'pca{i}_clo' for i in range(transformed_clo.shape[1])],
-            #     index=data.index
-            # )
-            # data = data.drop(clo_columns.columns, axis=1)
-            # data = pd.concat([data, transformed_clo], axis=1)
-
             # step_pca
             if self.use_pca:
-                # data_X = data.filter(regex='_q') #data.drop(columns=self.out)
-                # data_y = data.drop(data.filter(regex='_q').columns, axis=1) #data[self.out]
-                # X_pca = self.pca_transformer.transform(data_X)
-                # X_pca = self.pca_scaler.transform(X_pca)
-                # X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}' for i in range(X_pca.shape[1])])
-                # data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
                 q_cols = data.filter(regex='_q').columns.tolist()
                 data_X_full = data[q_cols].astype(float)
                 data_y = data.drop(columns=q_cols)
@@ -472,29 +407,11 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
                 X_pca_df = pd.DataFrame(X_pca, columns=pc_cols)
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
 
-
-            # data = self._select_correlated_features(data, self.out,
-            #         fit=False, correlation_threshold=correlation_threshold)
-
-            # step_EFA
-            # data_X = data.filter(regex='PC')
-            # factor_scores = self.fa.transform(data_X)
-            # factor_scores_df = pd.DataFrame(factor_scores, columns=[f'Factor{i+1}' for i in range(factor_scores.shape[1])])
-            # data_y = data.drop(data.filter(regex='PC').columns, axis=1)
-            # data = pd.concat([factor_scores_df, data_y.reset_index(drop=True)], axis=1)
-
             if self.use_corr:
                 data = self._select_correlated_features(data, self.out,
                                                 fit=False,
                                                 correlation_threshold=correlation_threshold)
 
-            # data_X = data.filter(regex='_q').copy() #data.drop(columns=self.out)
-            # data_X[self.out] = data[self.out]
-            # data_y = data.drop(data_X.columns, axis=1) #data[self.out]
-            # X_corr_df = self._select_correlated_features(data_X, self.out,
-            #     fit=False, correlation_threshold=correlation_threshold)
-            # data = pd.concat([X_corr_df, data_y], axis=1)
-            # print("Outcome:", self.out, "in columns?", self.out in data.columns)
             y = data.pop(self.out)
             # outcome transform policy (apply train-fold params, then scaler)
             y = self._transform_y_apply(y)
@@ -510,40 +427,9 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
     ys = []
     pca_loadings_list = []
     for train_index, test_index in tqdm(list(loo.split(test_binned)), total=len(test_binned)):
-        # bootstrapped = test_binned.sample(n = len(test_binned), replace=True)
-        # oob_ids = set(test_binned['BiPs_DID']) - set(bootstrapped['BiPs_DID'])
-        # oob_sample = test_binned[test_binned['BiPs_DID'].isin(oob_ids)]
-        # test_outcomes = None
-        # if outcome_test_id == 0:
-        #     test_outcomes = outcome_names
-        # elif outcome_config_id == 1:
-        #     test_outcomes = outcome_tests[outcome_test_id]
-        # else:
-        #     raise ValueError("unknown id")
-
-        # results = []
-        # one_outcome = outcome_tests[outcome_test_id]
-
         np.random.seed(2025)
-        # models = {
-        #     'RIDGE': Ridge(alpha=1, random_state=2025),
-        #     # 'SVR': SVR(C=1, kernel='linear'),
-        #     # 'RF': RandomForestRegressor(random_state=2025),
-        #     'LR': LinearRegression(),
-        #     'ET': ExtraTreesRegressor(
-        #         random_state=2025,
-        #         n_estimators=100,
-        #         max_depth=10,
-        #         min_samples_split=5,
-        #         n_jobs=1
-        #     )
-        # }
+
         models = {
-            # 'RIDGE': Ridge(alpha=1.0, random_state=2025),
-            # 'SVR': SVR(C=1, kernel='linear'),
-            # 'GBR': GradientBoostingRegressor(loss="quantile", alpha=0.9, random_state=2025),
-            # 'LR': LinearRegression(),
-            # 'RF': RandomForestRegressor(random_state=2025,n_jobs=1)
             'RIDGE': Ridge(alpha=1.0, random_state=2025),
             'LR': LinearRegression(),
             'GBR': GradientBoostingRegressor(loss="quantile", alpha=0.9, random_state=2025),
@@ -577,21 +463,6 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             drop_pat = "_pt1" if view == "fm" else "_fm1"
             drop_cols = [c for c in X.columns if drop_pat in c]
             return X.drop(columns=drop_cols)
-        # cols = [c for c in list(X_train.columns) if c in list(X_train.filter(regex='(_co$)'))]
-        # cols = [c for c in list(X_train.columns) if c in list(X_train.filter(regex='(coreg_sp2_fm1_co)|(coreg_s_pt1_co)'))]
-        # X_train = X_train[cols]
-        # cols = [c for c in list(X_test.columns) if c in list(X_test.filter(regex='(_co$)'))]
-        # cols = [c for c in list(X_test.columns) if c in list(X_test.filter(regex='(coreg_sp2_fm1_co)|(coreg_s_pt1_co)'))]
-        # X_test = X_test[cols]
-        # X_train.to_csv("check.csv")
-        # print([c for c in X_train.columns if c.endswith("clo") ])
-        # print(len([c for c in X_train.columns if c.endswith("clo") ]))
-        # X_train.to_csv("test_binned.csv")
-        # X_train = pipeline.fit_transform(bootstrapped)
-        # X_test = pipeline.transform(oob_sample)
-        # y_test = X_test.pop(one_outcome)
-        # y_train = X_train.pop(one_outcome)
-        # feature_names = X_train.columns.tolist()
 
         for name, model in models.items():
             if name != loocv_model:
@@ -602,92 +473,24 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             assert list(Xtr.columns) == list(Xte.columns)
 
             model.fit(Xtr, y_train)
-            # correlation = np.corrcoef(y_test.to_numpy(),
-            #                         model.predict(X_test))[0, 1]
-            # rsq = correlation ** 2 # should follow yardstick's rsq computation
-            # rmse = root_mean_squared_error(y_test.to_numpy(), model.predict(X_test))
             if name == 'RIDGE' or name == 'LR':
                 explainer = shap.LinearExplainer(model, shap.sample(Xtr, 100))#shap.sample(X_train, 100))
             elif name == 'SVR':
                 explainer = shap.KernelExplainer(model.predict, shap.sample(Xtr, 100))#shap.sample(X_train, 100))
             elif name == 'RF' or name == 'GBR' or name == 'ET':
                 explainer = shap.TreeExplainer(model)
-            # explainer = shap.Explainer(model)
             shap_values = explainer.shap_values(Xte).flatten()
             shap_dict = dict(zip(Xte.columns.tolist(), shap_values))
-            # JB: some complicated logic to map the raw features to the PC's from PCA so that the
-            # RF models can be aligned with RIDGE, LR, and SVR -- don't bother
-            # if name == "RF":
-            #     pipe_tmp = PreprocessingPipeline(
-            #         given_out=one_outcome,
-            #         outcome_names=outcome_names,
-            #         use_aug=use_aug,
-            #         use_corr=use_corr,
-            #         use_pca=True)
-            #     _, _ = pipe_tmp.fit_transform(test_binned.iloc[train_index, :])
-            #     pipe_tmp.pca_transformer
-            #     pca_components = pipe_tmp.pca_transformer.components_
-
-            #     original_features = pipe_tmp.pca_in_cols #.columns.tolist()
-            #     pca_dict = {}
-            #     for idx, feature in enumerate(original_features):
-            #         # Find the PC (row index) with the highest absolute loading for this feature
-            #         max_pc_index = np.argmax(np.abs(pca_components[:, idx]))
-            #         # Map the feature to the corresponding PC (e.g., 'PC1', 'PC2', etc.)
-            #         pca_dict[feature] = f'PC{max_pc_index + 1}'
-
-            #     shap_dict = defaultdict(list)
-            #     for test_col, one_shap_val in zip(X_test.columns.tolist(), shap_values):
-            #         if test_col in pca_dict:
-            #             shap_dict[pca_dict[test_col]].append(one_shap_val)
-            #         else:
-            #             shap_dict[test_col].append(one_shap_val)
-
-            #     new_shap_dict = {}
-            #     for test_col, shap_val_list in shap_dict.items():
-            #         new_shap_dict[test_col] = np.array(shap_val_list).\
-            #             flat[np.abs(shap_val_list).argmax()]
-            #         # new_shap_dict[test_col] = np.mean(np.abs(shap_val_list))
-            #     shap_dict = new_shap_dict
-
-            #     pc_mapping = pd.Series(
-            #         {col: pca_dict.get(col, col) for col in X_test.columns})
-            #     X_test = X_test.T.groupby(pc_mapping).mean().T
-            # else:
-            #     shap_dict = dict(zip(X_test.columns.tolist(), shap_values))
-
-            # list_base_values.append(explainer.expected_value)
+ 
             # Normalize expected_value to a scalar float (avoids object arrays / broadcasting issues)
             list_base_values.append(float(np.asarray(explainer.expected_value).reshape(-1)[0]))
             list_shap_values.append(shap_dict)
             list_test_sets.append(Xte)
+			
             if name != "GBR":
-                # ys.append(y_test.to_numpy()[0])
                 ys.append(y_test[0])
                 y_preds.append(model.predict(Xte)[0])
-            # if name == 'RIDGE':
-            #     weights = model.coef_
-            # elif name == 'SVR':
-            #     weights = model.coef_[0]
-            # elif name == 'RF':
-            #     weights = model.feature_importances_
-            # elif name == "LR":
-            #     weights = model.coef_
 
-            # results.append({
-            #     'loocv_id': loocv_id,
-            #     'out': one_outcome,
-            #     'model' : name,
-            #     'pred': model.predict(X_test).tolist()[0],
-            #     'y': y_test.tolist()[0],
-            #     'feat_names': feature_names,
-            #     'abs_weights': np.abs(weights).tolist(),
-            #     'n_components': int(pipeline.pca_transformer.n_components_)
-            #         if pipeline.pca_transformer is not None else -1,
-            #     'preproc': preproc_method
-            #     # 'rsq': float(rsq),
-            #     # 'rmse': float(rmse)
-            # })
     if use_pca:
         padded_loadings_list = []
         all_columns = set()
@@ -727,14 +530,7 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
     unique_keys = sorted({key for d in list_shap_values for key in d.keys()})
     num_rows = len(list_shap_values)
     num_cols = len(unique_keys)
-    # shap_array = np.full((num_rows, num_cols), np.nan)
-    # shap_array = np.zeros((num_rows, num_cols)) #np.full((num_rows, num_cols), np.nan)
 
-    # for i, (shap_dict, base_value) in enumerate(zip(list_shap_values, list_base_values)):
-    #     shap_array[i, :] = base_value
-    #     for j, key in enumerate(unique_keys):
-    #         if key in shap_dict:
-    #             shap_array[i, j] = float(np.asarray(shap_dict[key]).reshape(-1)[0])
     shap_array = np.zeros((num_rows, num_cols), dtype=float)
 
     for i, shap_dict in enumerate(list_shap_values):
@@ -742,25 +538,11 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
             if key in shap_dict:
                 shap_array[i, j] = float(np.asarray(shap_dict[key]).reshape(-1)[0])
 
-    # test_set_df = pd.concat(list_test_sets).reset_index(drop=True)
-    # test_set_df = test_set_df[unique_keys]
-    # test_set_df = test_set_df.fillna(0) # ???
     test_set_df = pd.concat(list_test_sets).reset_index(drop=True)
     # Align to union feature space; missing => absent in that fold
     test_set_df = test_set_df.reindex(columns=unique_keys).fillna(0)
 
-    # test_set = list_test_sets[0]
-    # shap_values = np.array(list_shap_values[0])
-    # for i in range(1, len(list_test_sets)):
-    # test_set = np.concatenate((test_set, list_test_sets[i]), axis=0)
-    # shap_values = np.concatenate((shap_values, np.array(list_shap_values[i])), axis=1)
-    # bringing back variable names
-    # X_test = test_binned.iloc[test_set]#pd.DataFrame(test_binned.iloc[[test_set], columns=columns)
-    # shap.summary_plot(shap_array, test_set_df, feature_names=unique_keys,max_display=30,show=False)
-    # shap.summary_plot(shap_array, plot_type="bar",show=False)
-    # plt.savefig(f"shap_summary_{one_outcome}_{preproc_method}_{loocv_model}.png",
-    #             bbox_inches="tight", dpi=300)
-    # plt.close()
+
     def analyze_shap_dist_spearman_fdr(shap_array, test_set_df, *,
                                   loocv_model, one_outcome, preproc_method,
                                   alpha=0.10, fdr_method="fdr_bh"):
@@ -862,128 +644,10 @@ def run_loocv_fold(loocv_id, one_outcome, preproc_method, loocv_model, view="bot
     )
     df["view"] = view
     return df
-    # return analyze_shap_dist_spearman_fdr(shap_array, test_set_df)
-    # explanation = shap.Explanation(
-    #     values=shap_array,
-    #     base_values=np.array(list_base_values),
-    #     data=test_set_df.values,
-    #     feature_names=test_set_df.columns.tolist(),
-    # )
-    # order = np.argsort(y_preds)
-    # shap.plots.heatmap(explanation,instance_order=order,show=False,max_display=20)
-    # plt.savefig(f"shap_heatmap_{one_outcome}_{preproc_method}_{loocv_model}.png",
-    #             bbox_inches="tight", dpi=300)
-    # plt.close()
-
-
-# IS_fm1: LR/111,RIDGE/111,SVR/111
-# se36_mean_pt1: LR/101, RIDGE/101, SVR/101
-# tb110_mean_pt1: RF/001
-
-# avg_SOL_min_pt: SVR/010
-# avgWASO_min_fm: RF/110
-# IS_fm1: LR/111,RIDGE/111,SVR/111
-# IV_fm1: LR/100, SVR/111
-# SRI_pt1: RF/000, SVR/110
-# se36_mean_pt1: LR/101, RIDGE/101, SVR/101
-# tb110_mean_pt1: RF/001
 
 if __name__ == '__main__':
 
-    # configs = [
-    #     {"out": "SRI_pt1_actrhythm", "model": "RF", "preproc": "000"},
-    #     {"out": "IS_fm1_actrhythm", "model": "LR", "preproc": "111"},
-    #     {"out": "IS_fm1_actrhythm", "model": "RIDGE", "preproc": "111"},
-    #     {"out": "IS_fm1_actrhythm", "model": "SVR", "preproc": "111"},
-    #     {"out": "IV_fm1_actrhythm", "model": "RF", "preproc": "100"},
-    #     {"out": "IV_fm1_actrhythm", "model": "LR", "preproc": "100"},
-    #     {"out": "se36_mean_pt1_sleep", "model": "RIDGE", "preproc": "101"},
-    #     {"out": "se36_mean_pt1_sleep", "model": "LR", "preproc": "101"},
-    #     {"out": "se36_mean_pt1_sleep", "model": "SVR", "preproc": "101"},
-    #     {"out": "tb110_mean_pt1_sleep", "model": "RF", "preproc": "001"},
-    #     {"out": "avgSD_hr_fm_actcomp", "model": "RF", "preproc": "111"},
-    #     {"out": "avgWASO_min_fm_actcomp", "model": "RF", "preproc": "011"}
-    # ]
-
-    # configs = [
-    #     {"out": "aaam_fm1_dailysaliva", "model": "ET", "preproc": "010"},
-    #     {"out": "aaam_pt1_dailysaliva", "model": "ET", "preproc": "101"},
-    #     {"out": "aala_fm1_dailysaliva", "model": "ET", "preproc": "111"},
-    #     {"out": "aala_pt1_dailysaliva", "model": "ET", "preproc": "110"},
-    #     {"out": "aapm_fm1_dailysaliva", "model": "ET", "preproc": "000"},
-    #     {"out": "aapm_pt1_dailysaliva", "model": "ET", "preproc": "101"}
-    # ]
-    # configs = [
-    #     {"out": "aaam_fm1_dailysaliva", "model": "LR", "preproc": "001"},
-    #     {"out": "aaam_pt1_dailysaliva", "model": "RIDGE", "preproc": "100"},
-    #     {"out": "aala_pt1_dailysaliva", "model": "RIDGE", "preproc": "111"},
-    #     {"out": "aapm_fm1_dailysaliva", "model": "RIDGE", "preproc": "110"},
-    #     {"out": "aapm_pt1_dailysaliva", "model": "RIDGE", "preproc": "000"}
-    # ]
-
-    # configs = [
-    #     {"out": "cortam_fm1_dailysaliva", "model": "LR", "preproc": "110"},
-    #     {"out": "cortam_pt1_dailysaliva", "model": "ET", "preproc": "110"},
-    #     {"out": "cortla_pt1_dailysaliva", "model": "RIDGE", "preproc": "001"},
-    #     {"out": "cortpm_fm1_dailysaliva", "model": "RIDGE", "preproc": "000"},
-    #     {"out": "cortpm_pt1_dailysaliva", "model": "ET", "preproc": "110"},
-    # ]
-
-    # configs = [
-    #     {"out": "dheasam_fm1_dailysaliva", "model": "LR", "preproc": "010"},
-    #     {"out": "dheasam_fm1_dailysaliva", "model": "RIDGE", "preproc": "011"},
-    #     {"out": "dheaspm_fm1_dailysaliva", "model": "ET", "preproc": "111"},
-    #     {"out": "dheaspm_pt1_dailysaliva", "model": "LR", "preproc": "001"},
-    #     {"out": "dheaspm_pt1_dailysaliva", "model": "RIDGE", "preproc": "000"}
-    # ]
-
     configs = [
-        # {"out": "aaslp7avg_fm1_dailysaliva", "model": "RF", "preproc": "011"},
-        # {"out": "aaslp7avg_fm1_dailysaliva", "model": "LR", "preproc": "110"},
-        # {"out": "aaslp7avg_fm1_dailysaliva", "model": "RIDGE", "preproc": "110"},
-
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "GBR", "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "RF", "preproc": "100"},
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "LR", "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "RIDGE", "preproc": "110"}
-
-        # {"out": "cortslp7avg_fm1_dailysaliva", "model": "LR", "preproc": "011"},
-        # {"out": "cortslp7avg_fm1_dailysaliva", "model": "RF", "preproc": "110"},
-        # {"out": "cortslp7avg_fm1_dailysaliva", "model": "RIDGE", "preproc": "011"},
-
-        # {"out": "cortslp7avg_pt1_dailysaliva", "model": "LR", "preproc": "110"},
-        # {"out": "cortslp7avg_pt1_dailysaliva", "model": "RIDGE", "preproc": "110"},
-
-        # {"out": "dheasslp7avg_pt1_dailysaliva", "model": "RF", "preproc": "001"}
-
-        # #jerry
-        # {"out": "aaslp7avg_fm1_dailysaliva", "model": "LR", "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "LR", "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva", "model": "RF", "preproc": "111"},
-        # {"out": "cortslp7avg_fm1_dailysaliva", "model": "LR", "preproc": "011"},
-        # {"out": "cortslp7avg_pt1_dailysaliva", "model": "LR", "preproc": "110"},
-        
-        # jerry 2
-        # {"out": "aaslp7avg_pt1_dailysaliva",    "model": "GBR",   "preproc": "110"},
-
-        # {"out": "aaslp7avg_fm1_dailysaliva",    "model": "LR",    "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva",    "model": "LR",    "preproc": "110"},
-        # {"out": "cortslp7avg_fm1_dailysaliva",  "model": "LR",    "preproc": "011"},
-        # {"out": "cortslp7avg_pt1_dailysaliva",  "model": "LR",    "preproc": "110"},
-
-        # {"out": "aaslp7avg_fm1_dailysaliva",    "model": "RF",    "preproc": "011"},
-        # {"out": "aaslp7avg_pt1_dailysaliva",    "model": "RF",    "preproc": "111"},
-        # {"out": "cortslp7avg_fm1_dailysaliva",  "model": "RF",    "preproc": "010"},
-        # {"out": "dheasslp7avg_pt1_dailysaliva", "model": "RF",    "preproc": "001"},
-
-        # {"out": "aaslp7avg_fm1_dailysaliva",    "model": "RIDGE", "preproc": "110"},
-        # {"out": "aaslp7avg_pt1_dailysaliva",    "model": "RIDGE", "preproc": "110"},
-        # {"out": "cortslp7avg_fm1_dailysaliva",  "model": "RIDGE", "preproc": "011"},
-        # {"out": "cortslp7avg_pt1_dailysaliva",  "model": "RIDGE", "preproc": "110"},
-
-        # {"out": "aaslp7avg_fm1_dailysaliva",    "model": "SVR",   "preproc": "110"},
-        # {"out": "cortslp7avg_fm1_dailysaliva",  "model": "SVR",   "preproc": "011"},
-        # {"out": "cortslp7avg_pt1_dailysaliva",  "model": "SVR",   "preproc": "110"}
 
         {"out": "aaslp7avg_fm1_dailysaliva",    "model": "ET",    "preproc": "011"},
         {"out": "aaslp7avg_fm1_dailysaliva",    "model": "GBR",   "preproc": "110"},
@@ -1033,18 +697,14 @@ if __name__ == '__main__':
         {"out": "cortslp7sd_pt1_dailysaliva",  "model": "GBR",    "preproc": "011"},
         {"out": "cortslp7sd_pt1_dailysaliva",  "model": "LR",    "preproc": "100"},
         {"out": "cortslp7sd_pt1_dailysaliva",  "model": "RF",   "preproc": "100"},
-        # {"out": "cortslp7sd_pt1_dailysaliva",  "model": "RIDGE",    "preproc": "100"},
         
 	    {"out": "dheasslp7sd_fm1_dailysaliva", "model": "ET",    "preproc": "111"},
         {"out": "dheasslp7sd_fm1_dailysaliva", "model": "LR",    "preproc": "000"},
         {"out": "dheasslp7sd_fm1_dailysaliva", "model": "RF",    "preproc": "111"},
-        # {"out": "dheasslp7sd_fm1_dailysaliva", "model": "RIDGE",    "preproc": "000"},
         
         {"out": "dheasslp7sd_pt1_dailysaliva", "model": "ET",    "preproc": "000"}
     ]
 
-    # loocv_id = int(sys.argv[1])
-    # outcome_config_id = int(sys.argv[2])
     def actor_view_for_outcome(out_name):
         o = out_name.lower()
         if "_fm1_" in o:
@@ -1123,12 +783,3 @@ if __name__ == '__main__':
         df_list.append(df_m)
 
     pd.concat(df_list).to_csv("shap_stage3_both_actor_delta3.csv", index=False)
-
-
-    # df_list = []
-    # for my_config in configs:
-    #     # run_loocv_fold(None, outcome_config_id, sys.argv[3])
-    #     df_list.append(run_loocv_fold(None, my_config['out'], my_config['preproc'], my_config['model']))
-
-    # pd.concat(df_list)\
-    #     .to_csv("shap_ranked_dist_all4_na.csv", index=0)
