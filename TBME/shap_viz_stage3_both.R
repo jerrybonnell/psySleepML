@@ -1,3 +1,5 @@
+# Script to generate SHAP heatmap for dyadic-positive models
+
 library(biscale)
 library(cowplot)
 library(grid)
@@ -6,64 +8,7 @@ library(tidyverse)
 library(ggh4x)
 
 #------------------------------------------------------------------------------
-# Load and prepare BOTH outcome types
-#------------------------------------------------------------------------------
-# df_mean <- read_csv("python/shap_stage3_both_actor_delta3_avg.csv") |>
-#   transmute(
-#     feature,
-#     model,
-#     out,
-#     mean_abs_impact = mean_abs_impact_both,
-#     rank = rank_both,
-#     on_delta = on_delta,
-#     on_actor = on_actor,   
-#     on_both  = on_both, 
-#     spear_delta = spear_delta,
-#     gate_both = gate_both,
-#     gate_actor = gate_actor,
-#     spear_both = spear_both,
-#     spear_actor = spear_actor,
-#     direction_flip = direction_flip
-#   ) |>
-#   mutate(outcome_type = "Mean Slope")
-# 
-# df_sd <- read_csv("python/shap_stage3_both_actor_delta3_sd.csv") |>
-#   transmute(
-#     feature,
-#     model,
-#     out,
-#     mean_abs_impact = mean_abs_impact_both,
-#     rank = rank_both,
-#     on_delta = on_delta,
-#     on_actor = on_actor,   
-#     on_both  = on_both, 
-#     spear_delta = spear_delta,
-#     gate_both = gate_both,
-#     gate_actor = gate_actor,
-#     spear_both = spear_both,
-#     spear_actor = spear_actor,
-#     direction_flip = direction_flip
-#   ) |>
-#   mutate(outcome_type = "Slope SD")
-# 
-# # Combine both datasets
-# df <- bind_rows(df_mean, df_sd) |>
-#   mutate(model_out = paste(model, out, sep = "_"),
-#          model_out = str_remove(model_out, "_[^_]+$")) |>
-#   group_by(model_out) |>
-#   mutate(new_model_name = paste0(model, cur_group_id()),
-#          rev_rank = ntile(rank, 2)) |>
-#   ungroup() |>
-#   # Incremental SHAP: show tiles where BOTH is ON and ACTOR is OFF
-#   mutate(shap_cat = case_when(
-#     on_delta ~ cut(spear_delta, breaks = c(-1, 0, 1)),
-#     TRUE ~ NA_character_
-#   )) |>
-#   mutate(rev_rank = factor(rev_rank, levels = c("1", "2")),
-#          shap_cat = factor(shap_cat, levels = c("(-1,0]", "(0,1]"))) |>
-#   arrange(outcome_type, out)
-#------------------------------------------------------------------------------
-# Load and prepare BOTH outcome types (combined file)
+# Load and prepare BOTH outcome types (AVG and SD)
 #------------------------------------------------------------------------------
 
 df <- read_csv("python/shap_stage3_both_actor_delta3_combined_90.csv") |>
