@@ -6,16 +6,9 @@ library(ggh4x)
 # Updated to use pct_bilateral (proportion) for SD outcomes
 # ------------------------------------------------------------
 
-# avg_path <- "python/shap_stage3_both_actor_delta3_avg.csv"
-# sd_path  <- "python/shap_stage3_both_actor_delta3_sd.csv"
-
 combined_path <- "python/shap_stage3_both_actor_delta3_combined_90.csv"
 
 df <- 
-#   bind_rows(
-#   read_csv(avg_path, show_col_types = FALSE),
-#   read_csv(sd_path,  show_col_types = FALSE)
-# ) |>
   read_csv(combined_path, show_col_types = FALSE) %>%
   transmute(
     feature,
@@ -130,12 +123,8 @@ model_metrics <- model_impact |>
     pct_bilateral = coalesce(pct_bilateral, 0)
   )
 
-# 7. Dyadic status - FROM STAGE 2 SCRIPT
+# 7. Dyadic status - FROM STAGE 2 SCRIPT (supervized_viz_stage2.R)
 dyadic_status <- 
-#   bind_rows(
-#   read_csv("python/loocv_bstrap_results020126_sd_stage2_status.csv"),
-#   read_csv("python/loocv_bstrap_results020126_stage2_status.csv")
-# ) |>
   read_csv("python/loocv_bstrap_results021026_combined_stage2_status_90.csv") %>% 
   mutate(
     model_out = paste(model, out, sep = "_") |> str_remove("_[^_]+$"),
@@ -337,82 +326,3 @@ bilateral_bins |>
 
 # # Optionally save
 # ggsave("shap_heatmap2_90.png", g_unified, width = 10, height = 10, dpi = 150)
-
-
-# # 11. Build the unified plot
-# g_unified <- ggplot(plot_data_unified, aes(x = display_value, y = model_ordered, fill = dyadic_label)) +
-#   # Threshold lines (uncomment if desired)
-#   geom_vline(
-#     data = threshold_data,
-#     aes(xintercept = threshold, linetype = is_best),
-#     inherit.aes = FALSE,
-#     color = "gray50", linewidth = 0.6, alpha=0.5
-#   ) +
-#   # Accuracy labels at threshold (uncomment if desired)
-#   # geom_text(
-#   #   data = threshold_data,
-#   #   aes(x = threshold, y = Inf, label = acc_label),
-#   #   inherit.aes = FALSE,
-#   #   vjust = 1.5, hjust = -0.2,
-#   #   size = 3, fontface = "bold", color = "gray30"
-#   # ) +
-#   # Bars
-#   geom_col(width = 0.7, alpha = 1, color = NA) +
-#   # Value labels
-#   geom_text(aes(x = value, label = val_label), hjust = -0.1, size = 2.8, 
-#             fontface = "bold", show.legend = FALSE) +
-#   # Faceting - free_y allows different models per row; 
-#   # both columns in a row share the same y-axis ordering (set by model_ordered factor levels)
-#   facet_grid2(
-#     outcome_label ~ metric_label,
-#     scales = "free",
-#     independent = "none"
-#   ) +
-#   # Scales
-#   # scale_fill_manual(
-#   #   values = c("Dyadic-positive" = "#2c7fb8", "Dyadic-null" = "#c0c0c0"),
-#   #   name = NULL
-#   # ) +
-#   scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "dashed"), guide = "none") +
-#   # Labels
-#   labs(
-#     # title = "Orthogonal Discriminators for Mean vs. SD Outcomes",
-#     # subtitle = "Δ Proportion best for Mean (93%); % Bilateral best for SD (92%)",
-#     x = NULL, y = NULL,
-#     # caption = "Δ Proportion: share of SHAP impact from incremental features\n% Bilateral: proportion of delta bins where both PT & FM show Δ signal"
-#   ) +
-#   # Theme
-#   # theme_minimal(base_size = 11) +
-#   theme_Publication() +
-#   theme(
-#     legend.position = "top",
-#     panel.grid.major.y = element_blank(),
-#     panel.grid.minor = element_blank(),
-#     strip.placement = "outside",
-#     strip.text = element_text(face = "bold", size = 11),
-#     # strip.background = element_rect(fill = "gray95", color = NA),
-#     # panel.border = element_rect(color = "gray80", fill = NA, linewidth = 0.5),
-#     panel.spacing = unit(1, "lines"),
-#     plot.title = element_text(face = "bold", size = 14),
-#     plot.subtitle = element_text(size = 10, color = "gray40"),
-#     plot.caption = element_text(hjust = 0, size = 8, face = "italic"),
-#     axis.text.y = element_text(size = 10),
-#     axis.text.x = element_text(size = 9)
-#   )
-# # Reformat model names to show outcome first, then model type in parentheses
-# plot_data_unified <- plot_data_unified |>
-#   mutate(
-#     model_ordered = forcats::fct_relabel(
-#       model_ordered,
-#       ~ {
-#         parts <- str_split(.x, "_", n = 2)
-#         sapply(parts, function(p) {
-#           if (length(p) == 2) {
-#             paste0(p[2], " (", p[1], ")")
-#           } else {
-#             .x
-#           }
-#         })
-#       }
-#     )
-#   )
