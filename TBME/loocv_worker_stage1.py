@@ -32,21 +32,11 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 
-# outcome_tests = {1: ["IS_fm1_actrhythm"]}
-# outcome_tests = {1: ["IV_fm1_actrhythm"]}
-# outcome_tests = {1: ["avgWASO_min_fm_actcomp"]}
-# outcome_tests = {1: ["tb110_mean_pt1_sleep"]}
-# outcome_tests = {1: ["se36_mean_pt1_sleep"]}
-# outcome_tests = {1: ["avgSOL_min_pt_actcomp"]}
-# outcome_tests = {1: ["aaslp7avg_fm1_dailysaliva"]}
 
 outcome_tests = {1: ["aaslp7avg_pt1_dailysaliva", "cortslp7avg_pt1_dailysaliva", "dheasslp7avg_pt1_dailysaliva",
-                     "aaslp7avg_fm1_dailysaliva", "cortslp7avg_fm1_dailysaliva", "dheasslp7avg_fm1_dailysaliva"]}
-
-# outcome_tests = {1: ["aaslp7sd_pt1_dailysaliva", "cortslp7sd_pt1_dailysaliva", "dheasslp7sd_pt1_dailysaliva",
-#                      "aaslp7sd_fm1_dailysaliva", "cortslp7sd_fm1_dailysaliva", "dheasslp7sd_fm1_dailysaliva"]}
-
-# outcome_tests = {1: ["dheasslp7avg_pt1_dailysaliva", "dheasslp7avg_fm1_dailysaliva"]}
+                     "aaslp7avg_fm1_dailysaliva", "cortslp7avg_fm1_dailysaliva", "dheasslp7avg_fm1_dailysaliva",
+                     "aaslp7sd_pt1_dailysaliva", "cortslp7sd_pt1_dailysaliva", "dheasslp7sd_pt1_dailysaliva",
+                     "aaslp7sd_fm1_dailysaliva", "cortslp7sd_fm1_dailysaliva", "dheasslp7sd_fm1_dailysaliva"]}
 
 """
 todo list
@@ -110,8 +100,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             return "asinh_unscaled"
         if o.startswith("dheasslp7avg") and "_pt1_" in o:
             return "asinh_unscaled"
-        # if o.startswith("aaslp7") or o.startswith("cortslp7"):
-        #     return "asinh_scaled"
         return "asinh_scaled"
 
     class PreprocessingPipeline:
@@ -165,7 +153,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             if fit:
 
                 correlation_with_outcome = data.corr()[outcome]
-                # correlation_with_outcome = data.corr(method="spearman")[outcome] -- tested
 
                 correlated_features = correlation_with_outcome[
                     correlation_with_outcome.abs() >= correlation_threshold].index.tolist()
@@ -205,11 +192,9 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 return y
             if self.y_policy == "asinh_unscaled":
                 return np.arcsinh(y)
-            # asinh_scaled
             s = getattr(self, "y_asinh_scale")
             return np.arcsinh(y / s)
 
-        # def fit_transform(self, data, clo_threshold=0.0, other_threshold=0.1):
         def fit_transform(self, data, correlation_threshold=0.1):
             """Fit the pipeline to training data and transform it"""
             data = data.copy()
@@ -233,14 +218,9 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             # there should be no missing values beyond this point
             assert not data.isnull().values.any()
 
-            # data.to_csv("after_dummy.csv")
-            # exit()
-
             # step_zv
             data = self._remove_zero_variance(data, fit=True)
             data.pop('BiPs_DID')
-
-            # data.to_csv("after_zv.csv")
 
             ## step_pca
             if use_pca:
@@ -256,22 +236,12 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 X_pca = self.pca_transformer.fit_transform(data_X)
                 X_pca = self.pca_scaler.fit_transform(X_pca)
                 X_pca_df = pd.DataFrame(X_pca, columns=[f'PC{i+1}_q' for i in range(X_pca.shape[1])])
-                # data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
 
-                # data.to_csv("after_pca.csv")
-
             ## step_correlated
-            # data.to_csv("after_corr.csv")
             if use_corr:
                 data = self._select_correlated_features(data, self.out,
                                                         fit=True, correlation_threshold=correlation_threshold)
-                # data = self._select_correlated_features(data, self.out,
-                #                                          fit=True,clo_threshold=clo_threshold, other_threshold=other_threshold)
-                # if returning without data augmentation:
-                # y = data.pop(self.out)
-                # return data, y
-                # data.to_csv("after_preproc.csv")
 
             ## LINES 187-195 data augmentation
             # the use of data augmentation here also functions as an alternative to the log
@@ -326,18 +296,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 idx = sampler.sample_indices_
                 y_res = y_cont.iloc[idx].to_numpy()
                 return X_res, y_res
-                # np.random.seed(2025)
-                # rs = resampler()
-                # y_classes = rs.fit(data, target=self.out, bins = 5,verbose=0)
-                # unq_classes = np.unique(y_classes)
-                # X_res, y_res = rs.resample(
-                #     RandomOverSampler(sampling_strategy={clss_lbl: 300 for clss_lbl in unq_classes},
-                #                       random_state=2025
-                #     ),
-                #     trainX=data,
-                #     trainY=y_classes
-                # )
-                # return X_res, y_res
             else:
                 # if returning without data augmentation:
                 y = data.pop(self.out)
@@ -357,8 +315,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             data[self.numeric_columns] = self.numeric_imputer.transform(data[self.numeric_columns])
 
             # step log -- all predictor variables, *not* outcomes
-            # log_cols = [col for col in data.columns if col.endswith('cardio') or col == self.out]
-            # log_cols = [col for col in data.columns if col.endswith('cardio') or col.endswith('clo')]
             log_cols = [col for col in data.columns if col.endswith('cardio')
                         or col.endswith('clo')  or col.endswith('_co') or col.endswith('acutesaliva')]
             for col in log_cols:
@@ -380,11 +336,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
                 data = pd.concat([X_pca_df, data_y.reset_index(drop=True)], axis=1)
 
             if use_corr:
-                # data = self._select_correlated_features(data, self.out,
-                #                                 fit=False,
-                #                                 clo_threshold=clo_threshold,
-                #                                 other_threshold=other_threshold)
-
                 data = self._select_correlated_features(data, self.out,
                         fit=False, correlation_threshold=correlation_threshold)
 
@@ -411,7 +362,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
         np.random.seed(2025)
         models = {
             'RIDGE': Ridge(alpha=1.0, random_state=2025),
-            # 'SVR': SVR(C=1, kernel='linear'),
             'LR': LinearRegression(),
             'GBR': GradientBoostingRegressor(loss="quantile", alpha=0.9, random_state=2025),
             'RF': RandomForestRegressor(random_state=2025,n_jobs=1),
@@ -432,7 +382,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
         # Fit and transform training data
         X_train, y_train = pipeline.fit_transform(test_binned.iloc[train_index, :])
         X_test, y_test = pipeline.transform(test_binned.iloc[test_index, :])
-        # pd.DataFrame(np.concat([y_train,y_test])).to_csv("y_test.csv")
 
         feature_names = X_train.columns.tolist()
 
@@ -449,12 +398,6 @@ def run_loocv_fold(loocv_id, outcome_test_id, preproc_method):
             shap_values_flat = shap_values.values.flatten().tolist()
 
             # Extract model coefficients
-            # if name in ['RIDGE', 'BayesRidge', 'LR', 'ENET']:
-            #     weights = model.coef_
-            # elif name == 'SVR':
-            #     weights = model.coef_[0]
-            # elif name == 'RF':
-            #     weights = model.feature_importances_
             if hasattr(model, "coef_"):
                 weights = model.coef_
                 if weights.ndim > 1:
