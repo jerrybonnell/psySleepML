@@ -1,3 +1,5 @@
+## Script to create 2 panel dyadic add-on results plot and create csv with add-on results for stage 3
+
 library(tidyverse)
 library(ggh4x)
 library(legendry) 
@@ -61,15 +63,6 @@ MANIFEST_CSV <- "python/loocv_bstrap_results021026_combined_stage2.csv"
 boot_raw <- read_csv(BOOT_PATH, show_col_types = FALSE)
 resid_raw <- read_csv(RESID_PATH, show_col_types = FALSE)
 partial_raw <- read_csv(PARTIAL_PATH, show_col_types = FALSE)
-# boot_raw <- read_csv(BOOT_PATH, show_col_types = FALSE) |>
-#   filter(str_detect(out, "sd"))
-# 
-# resid_raw <- read_csv(RESID_PATH, show_col_types = FALSE) |>
-#   filter(str_detect(out, "sd"))
-# 
-# partial_raw <- read_csv(PARTIAL_PATH, show_col_types = FALSE) |>
-#   filter(str_detect(out, "sd"))
-
 
 manifest <- read_csv(MANIFEST_CSV, show_col_types = FALSE) |>
   # filter(significant.95 & significant_ci.95) %>% 
@@ -114,13 +107,10 @@ stage2_delta_roles <- function(raw_boot, metric = "spearman") {
     add_sig_flags_pos()
 }
 
-# delta_roles <- stage2_delta_roles(boot_raw, metric = "spearman") |>
 delta_roles_all <- stage2_delta_roles(boot_raw, metric = "spearman") |>
   mutate(
     feat = str_replace_all(feat, c("fm1"="fm", "pt1"="pt")),
     out = paste0(feat, "_", db)) |>
-  # ) |>
-  # inner_join(manifest, by = c("out","model","preproc"="preproc_org")) |>
   mutate(
     contrast = factor(contrast, levels = c(
       "Add FM: both vs PT-only ",
@@ -150,10 +140,6 @@ partial_sum <- partial_raw |>
     out2 = paste0(feat, "_", db),
     contrast = "Partial add-value: ρ( y , ŷ_BOTH | ŷ_actor )"
   ) |>
-  # group_by(model, out2) |>
-  # arrange(desc(mean), .by_group = TRUE) |>
-  # slice(1) |>
-  # ungroup()
   inner_join(manifest, by = c("out2" = "out", "model", "preproc" = "preproc_org"))
 
 best_supp_keys <- partial_sum |>
@@ -226,13 +212,6 @@ plot_all <- plot_all |>
   )
 
 # 4) set x levels in the correct order (feat block, then model within)
-# x_levels <- plot_all |>
-#   distinct(feat_f, model_f, x) |>
-#   arrange(feat_f, model_f) |>
-#   pull(x)
-# 
-# plot_all <- plot_all |>
-#   mutate(x = factor(x, levels = x_levels))
 x_levels <- plot_all |>
   distinct(feat_f, model_f, x) |>
   arrange(
@@ -248,7 +227,6 @@ plot_all <- plot_all |>
 
 pd <- position_dodge(width = 0.85)
 
-##for the paper
 plot_all |> select(-c(x,model_f,feat_f,lower,upper,db)) |> 
   mutate(mean=100*mean) |> print(n=60) |> 
   arrange(model, feat, stat) |> print(n=100)
@@ -294,9 +272,7 @@ g_both <- plot_all |>
     fill = NULL
   ) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))) +
-  # theme(legend.position = "top") +
   theme(
-    # ggh4x.axis.nesttext.x = element_text(angle = 45, hjust = 1),
     legend.position = "top",
     panel.border = element_rect(color = "black", fill = NA, size = 1),
     strip.background = element_rect(fill = "gray90", color = "black", linewidth = 0.5)
@@ -304,54 +280,3 @@ g_both <- plot_all |>
   scale_fill_Publication()
 
 g_both
-
-# 
-# 
-# plot_all <- plot_all |>
-#   mutate(is_suppress = panel == "suppression: ρ( y − ŷ_actor , ŷ_both − ŷ_actor )")
-# 
-# g_both <- plot_all |>
-#   ggplot(aes(x = x, y = mean)) +
-#   # ---- Panel A: absolute rho as colored bars (PT/FM/BOTH) ----
-# geom_col(
-#   data = ~ dplyr::filter(.x, !is_suppress),
-#   aes(fill = stat, group = stat),
-#   position = pd, color = "gray", linewidth = 0.3, width = 0.78
-# ) +
-#   geom_errorbar(
-#     data = ~ dplyr::filter(.x, !is_suppress),
-#     aes(ymin = lower, ymax = upper, group = stat),
-#     position = pd, width = 0.18, linewidth = 0.4
-#   ) +
-#   
-#   # ---- Panel B: suppression diagnostic as neutral pointrange ----
-# geom_pointrange(
-#   data = ~ dplyr::filter(.x, is_suppress),
-#   aes(ymin = lower, ymax = upper),
-#   color = "gray20", linewidth = 0.4
-# ) +
-#   geom_hline(yintercept = 0, linewidth = 0.4) +
-#   geom_text(
-#     data = ~ dplyr::filter(.x, !is_suppress),
-#     aes(label = label, group = stat),
-#     position = pd, vjust = -0.2, size = 5
-#   ) +
-#   geom_text(
-#     data = ~ dplyr::filter(.x, is_suppress),
-#     aes(label = label),
-#     vjust = -0.2, size = 5, color = "gray20"
-#   ) +
-#   facet_grid(panel ~ db, scales = "free", space = "free_x") +
-#   scale_x_discrete(guide = guide_axis_nested(angle = 90)) +
-#   theme_Publication() +
-#   labs(
-#     x = "Outcome (model × role)",
-#     y = "Spearman scale (ρ)",
-#     fill = NULL
-#   ) +
-#   scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))) +
-#   theme(legend.position = "top") +
-#   scale_fill_Publication()
-# g_both
-# 
-# 
