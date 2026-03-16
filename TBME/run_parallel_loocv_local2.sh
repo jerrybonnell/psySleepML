@@ -1,33 +1,5 @@
 #!/bin/bash
 
-# conda activate myenv
-
-# SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# PYTHON_SCRIPT="${SCRIPT_DIR}/loocv_worker_2.py"
-# N_FOLDS=149
-# N_JOBS=10
-# OUTPUT_FILE="${SCRIPT_DIR}/loocv_results.jsonl"
-# # PREPROC_ID=3
-
-# # Remove output file if it exists
-# rm -f $OUTPUT_FILE
-
-# # seq 0 $(($N_FOLDS-1)) | parallel --jobs $N_JOBS \
-# #     --progress \
-# #     --bar \
-# #     --eta \
-# #     "python ${PYTHON_SCRIPT} {} 0 ${PREPROC_ID}" >> $OUTPUT_FILE
-#     #::: "000" "001" "010" "011" "100" "101" "110" "111" \
-#     #::: "000" "100" "111"
-
-# parallel --jobs $N_JOBS \
-#     --progress \
-#     --bar \
-#     --eta \
-#     "python ${PYTHON_SCRIPT} {1} 0 {2}" \
-#     ::: $(seq 0 $(($N_FOLDS-1))) \
-#     ::: "000" "001" "010" "011" "100" "101" "110" "111"  \
-#     >> $OUTPUT_FILE
 conda activate myenv
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -36,9 +8,8 @@ N_FOLDS=149
 N_JOBS=10
 OUTPUT_FILE="${SCRIPT_DIR}/loocv_results.jsonl"
 
-# Get outcome_config_id from command line argument, default to 1
 OUTCOME_CONFIG_ID=${1:-1}
-PREPROC_METHOD=${2:-"100"}  # Optional: second arg for preproc_method
+PREPROC_METHOD=${2:-"100"}
 
 # Remove output file if it exists
 rm -f "$OUTPUT_FILE"
