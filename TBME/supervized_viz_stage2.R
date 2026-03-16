@@ -1,4 +1,4 @@
-## Script to create 2 panel dyadic add-on results plot and create csv with add-on results for stage 3
+## Script to create two panel dyadic add-on results plot and create csv with add-on results for stage 3
 
 library(tidyverse)
 library(ggh4x)
