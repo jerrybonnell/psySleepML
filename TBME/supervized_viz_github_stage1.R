@@ -1,4 +1,5 @@
-## Script to generate R^2 plot and feature importance plot
+# Script to generate resampled Spearman correlation bar plot (predictive performance)
+# Also writes csv with significant configs for stage 2
 
 library(tidyverse)
 library(ggplot2)
@@ -87,30 +88,10 @@ my_read_csv <- function(path) {
                                    preproc == "P+C+A" ~ "3"))
 }
 
-# raw_main <- read_csv("python/loocv_bstrap_results012826_120530_colog_bestconfig.csv")
-# raw_fix  <- read_csv("python/loocv_bstrap_results012926_000605_sd_colog_allscaledasinh.csv")
-# 
-# # Remove rows in raw_main that appear in raw_fix
-# raw_main_updated <- raw_main |>
-#   filter(!(out %in% raw_fix$out)) |>
-#   bind_rows(raw_fix) %>%
-#   write_csv("python/loocv_bstrap_results021026_combined.csv")
-
-
-# df <- my_read_csv("python/loocv_bstrap_results051425.csv") %>% 
-# df <- my_read_csv("python/loocv_bstrap_results072425_test.csv") %>%
-# df <- my_read_csv("python/loocv_bstrap_results123125_1.csv") %>%
-# df <- my_read_csv("python/loocv_bstrap_results123125.csv") %>%
 df <- my_read_csv("python/loocv_bstrap_results021026_combined.csv") %>%
-  # df <- my_read_csv("python/loocv_bstrap_results010326_211508_dyad1.csv") %>%
-  # df <- my_read_csv("python/loocv_bstrap_results032425_manuscript.csv") %>%
   filter(.metric=="spearman")
 
-# df.rmse <- my_read_csv("python/loocv_bstrap_results072425_test.csv") |>
-# df.rmse <- my_read_csv("python/loocv_bstrap_results123125_1.csv") |>
-# df.rmse <- my_read_csv("python/loocv_bstrap_results123125.csv") |>
 df.rmse <- my_read_csv("python/loocv_bstrap_results021026_combined.csv") |>
-  # df <- my_read_csv("python/loocv_bstrap_results021625me.csv") |>
   filter(.metric == "rmse")
 
 df <- df |>
@@ -121,10 +102,6 @@ df <- df |>
          significant_ci.90 = lower2 > 0.01,
          significant.95 = adjusted_p_val <= 0.05,
          significant_ci.95 = lower > 0.01)
-
-df |>
-  filter(.metric == "spearman", significant.95 & significant_ci.95) |>
-  arrange(feat)
 
 df_baseline <- df |> filter(preproc == "none") |>
   select(model, feat, db, mean) |>
@@ -140,7 +117,7 @@ df2
 df |>
   filter(.metric == "spearman", significant.90 & significant_ci.90) |>
   arrange(feat) |>
-  write_csv("python/loocv_bstrap_results021026_combined_stage2.csv")
+  write_csv("python/loocv_bstrap_results021026_combined_stage2.csv") # significant configs for stage 2
 
 check_groups <- df |>
   filter(.metric == "spearman") |>
@@ -149,20 +126,17 @@ check_groups <- df |>
   slice(1) |>
   ungroup() |>
   mutate(model = factor(model, levels = c("ET", "RF", "GBR", "LR", "RIDGE"))) |>
-  # Extract root outcome and stat
   mutate(
     root = case_when(
       str_detect(feat, "aa") ~ "sAA",
       str_detect(feat, "cort") ~ "Cortisol",
       str_detect(feat, "dheas") ~ "DHEAS"
     ),
-    # Format facet and x-axis labels (rename to AVG and SD and capitalize parts of name)
     stat_group = if_else(str_detect(feat, "avg"), "Mean", "SD"),
     feat = str_replace_all(feat, c("slp7" = "", "avg" = "AVG", "sd" = "SD", "pt1" = "PT", "fm1" = "FM")),
     # Only keep preproc if significant
     preproc = if_else(significant.90 & significant_ci.90, preproc, NA_character_)
   ) |>
-  # Set factor levels to control plot order
   mutate(
     root = factor(root, levels = c("sAA", "Cortisol", "DHEAS")),
     stat_group = factor(stat_group, levels = c("Mean", "SD")),
@@ -194,7 +168,6 @@ g <- check_groups |>
   )),
   vjust = -0.2,
   size = 6) +
-  # Add strip styling directly in facet_nested
   facet_nested(
     ~ root + stat_group, 
     scales = "free_x", 
@@ -205,13 +178,12 @@ g <- check_groups |>
         element_rect(fill = "gray90", color = "black")      # stat level
       ),
       text_x = list(
-        element_text(size = 14, face = "bold", color = "black"),  # root level
-        element_text(size = 12, face = "bold", color = "black")   # stat level (smaller)
+        element_text(size = 14, face = "bold", color = "black"),
+        element_text(size = 12, face = "bold", color = "black") 
       ),
       by_layer_x = TRUE
     )
   ) +
-  # new syntax with legendry
   scale_x_discrete(
     guide = legendry::guide_axis_nested(
       key = key_range_auto(sep = "\\."),
@@ -249,156 +221,3 @@ print(g)
 # # save high-res version
 # ggsave("loocv_saliva_stage1_v2.png", g,
 #        width = 16, height = 6.5, dpi = 300, bg = "white")
-
-# check_groups<-df |>
-#   filter(.metric == "spearman") |>
-#   group_by(model, feat, db) |>
-#   arrange(desc(significant.90), desc(significant_ci.90), desc(mean),
-#           .by_group = TRUE) |>
-#   # arrange(desc(significant.90), desc(significant_ci.90), desc(mean), 
-#   #          .by_group = TRUE) |>
-#   slice(1) |>
-#   ungroup() |>
-#   mutate(preproc = factor(preproc,
-#                           levels = c("none", "preproc", "P", "C", "A",
-#                                      "C+A", "P+A", "P+C", "P+C+A"))) |>
-#   mutate(preproc = case_when(
-#     significant.90 & significant_ci.90 ~ preproc, 
-#     TRUE ~ NA)) %>% 
-#   mutate(feat = str_replace(feat, "fm1", "fm")) %>% 
-#   mutate(feat = str_replace(feat, "pt1", "pt"))
-# 
-# #dev.off()
-# 
-# g = check_groups |>
-#   ggplot(aes(x = interaction(model, feat),
-#              y = mean, fill = preproc,
-#              group = as_factor(model))) +
-#   geom_bar(
-#     color = "gray",
-#     linewidth=0.3,
-#     stat = "identity", position = "dodge") +
-#   geom_text(aes(label = case_when(
-#     significant.95 & significant_ci.95 ~ "**", 
-#     # significant.90 & significant_ci.90 ~ "**", 
-#     significant.90 & significant_ci.90 ~ "*", 
-#     TRUE ~ NA)),
-#     vjust = 0,
-#     size=6) +
-#   facet_grid(~db, scales = "free_x", space="free_x") +
-#   scale_x_discrete(guide =
-#                      guide_axis_nested(angle=90)) +
-#   scale_fill_viridis_d(option="F", direction = -1) +
-#   theme_Publication() +
-#   theme(
-#     axis.text.x = element_text(
-#       size = 8
-#     ),
-#     ggh4x.axis.nesttext.x = element_text(
-#       angle = 45, hjust = 1, size = 13
-#     ),
-#     axis.text.y = element_text(size = 16),
-#     axis.title.x = element_text(size = 18),  # Adjust x-axis title size
-#     axis.title.y = element_text(size = 18),
-#     strip.text = element_text(face = "bold", size = 18, color = "black"),
-#     legend.title = element_text(size = 18),  # Make legend title smaller and not italicized
-#     legend.text = element_text(size = 16),
-#     strip.background = element_rect(color = "black", fill = "gray90", size = 1),  
-#     panel.border = element_rect(color = "black", size = 1),
-#     panel.spacing = unit(0.5, "lines")
-#   ) +
-#   scale_y_continuous(expand = c(0,0),
-#                      limits = c(0,0.6)) +
-#   labs(
-#     x = "Sleep Health Outcome",
-#     # y = "Resampled R² score\n",
-#     y = "Resampled Spearman corr.\n",
-#     fill = "Preprocessing Combination:"
-#   ) +
-#   guides(fill = guide_legend(nrow = 1)) +
-#   theme(axis.title.y = element_text(angle = 90, hjust = 1),
-#         axis.title.x = element_blank())
-# g
-# 
-# library(grid)
-# gt = ggplot_gtable(ggplot_build(g))
-# grid.draw(gt)
-
-
-# check_groups <- df |>
-#   filter(.metric == "spearman") |>
-#   group_by(model, feat, db) |>
-#   arrange(desc(significant.90), desc(significant_ci.90), desc(mean), .by_group = TRUE) |>
-#   slice(1) |>
-#   ungroup() |>
-#   # 1. Order models as requested
-#   mutate(model = factor(model, levels = c("ET", "RF", "GBR", "LR", "RIDGE"))) |>
-#   # 2. Extract root outcome and stat
-#   mutate(
-#     root = case_when(
-#       str_detect(feat, "aa") ~ "sAA",
-#       str_detect(feat, "cort") ~ "Cortisol",
-#       str_detect(feat, "dheas") ~ "DHEAS"
-#     ),
-#     stat_group = if_else(str_detect(feat, "avg"), "Average", "Std. Dev"),
-#     # Capitalize the avg/sd and pt/fm part of feat
-#     feat = str_replace_all(feat, c("avg" = "AVG", "sd" = "SD", "pt1" = "PT1", "fm1" = "FM1")),
-#     # Only keep preproc if significant
-#     preproc = if_else(significant.90 & significant_ci.90, preproc, NA_character_)
-#   ) |>
-#   # 3. Set factor levels
-#   mutate(
-#     root = factor(root, levels = c("sAA", "Cortisol", "DHEAS")),
-#     stat_group = factor(stat_group, levels = c("Average", "Std. Dev")),
-#     preproc = factor(preproc,
-#                      levels = c("none", "preproc", "P", "C", "A",
-#                                 "C+A", "P+A", "P+C", "P+C+A"))
-#   )
-# 
-# # Visualization
-# g <- check_groups |>
-#   ggplot(aes(x = interaction(model, feat),
-#              y = mean,
-#              fill = preproc,
-#              group = interaction(model, feat))) +
-#   geom_bar(
-#     color = "gray40",
-#     linewidth = 0.3,
-#     stat = "identity",
-#     position = "dodge"
-#   ) +
-#   geom_text(aes(label = case_when(
-#     significant.95 & significant_ci.95 ~ "**",
-#     significant.90 & significant_ci.90 ~ "*",
-#     TRUE ~ NA
-#   )),
-#   vjust = -0.2,
-#   size = 6) +
-#   # Nested facet: root outcome on top
-#   facet_nested(~ root, scales = "free_x", space = "free_x") +
-#   scale_x_discrete(guide = guide_axis_nested(angle = 90)) +
-#   scale_fill_viridis_d(option = "F", direction = -1, na.value = "gray95") +
-#   theme_Publication() +
-#   theme(
-#     axis.text.x = element_text(size = 10),
-#     ggh4x.axis.nesttext.x = element_text(angle = 45, hjust = 1, size = 12),
-#     axis.text.y = element_text(size = 16),
-#     axis.title.y = element_text(size = 16, angle = 90, vjust = 1),
-#     strip.text = element_text(face = "bold", size = 14, color = "black"),
-#     legend.title = element_text(size = 16),
-#     legend.text = element_text(size = 16),
-#     strip.background = element_rect(color = "black", fill = "gray90", size = 0.5),
-#     panel.border = element_rect(color = "black", fill = NA, size = 1),
-#     panel.spacing = unit(0.4, "lines"),
-#     legend.position = "top"
-#   ) +
-#   scale_y_continuous(expand = c(0, 0), limits = c(0, 0.55)) +
-#   labs(
-#     x = "Daily Saliva Outcome",
-#     y = "Resampled Spearman corr.\n",
-#     fill = "Preprocessing Combination:"
-#   ) +
-#   guides(fill = guide_legend(nrow = 1))
-# 
-# # Render plot
-# print(g)
